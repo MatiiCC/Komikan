@@ -1,0 +1,16 @@
+# Archivo de Configuración - Torneo Komikan Concurrente
+# Parámetros iniciales de simulación
+
+# Retardos mínimos y máximos por movimiento en milisegundos (ms)
+retardo_min = 50
+retardo_max = 300
+
+# Semilla para números aleatorios (0 para tiempo actual time(NULL))
+seed = 42
+
+# Posición inicial del Puma (27 = Trono)
+posicion_puma = 27
+
+# Posiciones iniciales de los 12 Perros (separadas por espacio)
+# Nodos 0 a 9 (filas 0 y 1 de la grilla) + nodos 10 y 14 (extremos fila 2)
+posiciones_perros = 0 1 2 3 4 5 6 7 8 9 10 14
