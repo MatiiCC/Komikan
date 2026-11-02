@@ -2,18 +2,20 @@ CXX = g++
 CXXFLAGS = -Wall -Wextra -std=c++17
 LDFLAGS = -lpthread
 
-SRCS = tablero.cpp config.cpp
+SRCS = tablero.cpp config.cpp mesa.cpp torneo.cpp
 OBJS = $(SRCS:.cpp=.o)
 
-all: test_tablero
+TARGET = torneo
+
+all: $(TARGET)
 
 %.o: %.cpp
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-test_tablero: test_tablero.o $(OBJS)
-	$(CXX) $(CXXFLAGS) test_tablero.o $(OBJS) -o test_tablero $(LDFLAGS)
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) $(OBJS) -o $(TARGET) $(LDFLAGS)
 
 clean:
-	rm -f *.o test_tablero torneo
+	rm -f *.o $(TARGET) test_tablero
 
 .PHONY: all clean
