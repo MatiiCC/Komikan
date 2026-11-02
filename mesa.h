@@ -4,7 +4,11 @@
 #include "tablero.h"
 #include "config.h"
 #include <pthread.h>
+#include <csignal>
 #include <vector>
+
+extern pthread_mutex_t mutex_consola;
+extern volatile sig_atomic_t terminar_programa;
 
 struct ContextoPerro {
     class Mesa* mesa;

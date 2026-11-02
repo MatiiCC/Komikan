@@ -7,8 +7,9 @@
 #include <csignal>
 #include <unistd.h>
 #include <ctime>
+#include <cerrno>
 
-static volatile sig_atomic_t terminar_programa = 0;
+volatile sig_atomic_t terminar_programa = 0;
 static sem_t sem_mesas;
 static std::vector<Mesa*> mesas_activas;
 static pthread_mutex_t mutex_mesas_activas = PTHREAD_MUTEX_INITIALIZER;
@@ -16,15 +17,9 @@ static pthread_mutex_t mutex_mesas_activas = PTHREAD_MUTEX_INITIALIZER;
 void manejador_sigint(int sig) {
     (void)sig;
     terminar_programa = 1;
-    std::cout << "\n[SERVIDOR] Señal SIGINT recibida (Ctrl+C). Deteniendo el torneo ordenadamente...\n";
-
-    pthread_mutex_lock(&mutex_mesas_activas);
-    for (Mesa* m : mesas_activas) {
-        if (m && m->esta_activa()) {
-            m->detener();
-        }
-    }
-    pthread_mutex_unlock(&mutex_mesas_activas);
+    const char msg[] = "\n[SERVIDOR] Senal SIGINT recibida (Ctrl+C). Iniciando apagado ordenado...\n";
+    ssize_t ret = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+    (void)ret;
 }
 
 struct DatosHiloPartida {
@@ -82,6 +77,7 @@ int main(int argc, char* argv[]) {
 
     sem_init(&sem_mesas, 0, config.M);
 
+    pthread_mutex_lock(&mutex_consola);
     std::cout << "=================================================\n";
     std::cout << "      TORNEO DE KOMIKAN CONCURRENTE\n";
     std::cout << "=================================================\n";
@@ -90,11 +86,14 @@ int main(int argc, char* argv[]) {
     std::cout << "Retardos: [" << config.retardo_min_ms << " ms - " 
               << config.retardo_max_ms << " ms]\n";
     std::cout << "=================================================\n\n";
+    pthread_mutex_unlock(&mutex_consola);
 
     int total_parejas = config.N / 2;
     if (config.N % 2 != 0) {
+        pthread_mutex_lock(&mutex_consola);
         std::cout << "[SERVIDOR] Aviso: N=" << config.N 
                   << " es impar. El ultimo jugador quedara en espera.\n";
+        pthread_mutex_unlock(&mutex_consola);
     }
 
     std::vector<pthread_t> hilos_gestores;
@@ -102,20 +101,28 @@ int main(int argc, char* argv[]) {
 
     for (int p = 0; p < total_parejas; p++) {
         if (terminar_programa) {
-            std::cout << "[SERVIDOR] No se aceptan nuevos jugadores por detencion del torneo.\n";
             break;
         }
 
         int j_puma = 2 * p + 1;
         int j_perros = 2 * p + 2;
 
+        pthread_mutex_lock(&mutex_consola);
         std::cout << "[MATCHMAKER] Emparejando Jugador " << j_puma 
                   << " (Puma) y Jugador " << j_perros << " (Perros). Esperando mesa disponible...\n";
+        pthread_mutex_unlock(&mutex_consola);
 
-        sem_wait(&sem_mesas);
+        int s_res;
+        while ((s_res = sem_wait(&sem_mesas)) != 0 && errno == EINTR) {
+            if (terminar_programa) {
+                break;
+            }
+        }
 
-        if (terminar_programa) {
-            sem_post(&sem_mesas);
+        if (terminar_programa || s_res != 0) {
+            if (s_res == 0) {
+                sem_post(&sem_mesas);
+            }
             break;
         }
 
@@ -126,19 +133,44 @@ int main(int argc, char* argv[]) {
         datos->config = config;
 
         pthread_t tid;
-        pthread_create(&tid, NULL, ejecutar_partida, datos);
-        hilos_gestores.push_back(tid);
+        if (pthread_create(&tid, NULL, ejecutar_partida, datos) == 0) {
+            hilos_gestores.push_back(tid);
+        } else {
+            std::cerr << "[ERROR] No se pudo crear hilo para mesa.\n";
+            delete datos;
+            sem_post(&sem_mesas);
+        }
     }
 
+    if (terminar_programa) {
+        pthread_mutex_lock(&mutex_consola);
+        std::cout << "[SERVIDOR] Deteniendo mesas activas...\n";
+        pthread_mutex_unlock(&mutex_consola);
+
+        pthread_mutex_lock(&mutex_mesas_activas);
+        for (Mesa* m : mesas_activas) {
+            if (m) {
+                m->detener();
+            }
+        }
+        pthread_mutex_unlock(&mutex_mesas_activas);
+    }
+
+    // Esperar a que terminen todos los hilos gestores y las mesas
     for (pthread_t tid : hilos_gestores) {
         pthread_join(tid, NULL);
     }
 
     sem_destroy(&sem_mesas);
     pthread_mutex_destroy(&mutex_mesas_activas);
+    pthread_mutex_destroy(&mutex_consola);
 
     std::cout << "\n=================================================\n";
-    std::cout << "      TORNEO FINALIZADO EXITOSAMENTE\n";
+    if (terminar_programa) {
+        std::cout << "  TORNEO INTERRUMPIDO Y CERRADO CORRECTAMENTE\n";
+    } else {
+        std::cout << "      TORNEO FINALIZADO EXITOSAMENTE\n";
+    }
     std::cout << "=================================================\n";
     return 0;
 }
