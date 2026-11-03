@@ -1,6 +1,6 @@
 CXX = g++
-CXXFLAGS = -Wall -Wextra -std=c++17
-LDFLAGS = -lpthread
+CXXFLAGS = -Wall -Wextra -std=c++17 -pthread
+LDFLAGS = -pthread
 
 SRCS = tablero.cpp config.cpp mesa.cpp torneo.cpp
 OBJS = $(SRCS:.cpp=.o)

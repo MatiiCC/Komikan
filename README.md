@@ -17,7 +17,7 @@ El sistema modela un servidor de torneo (*Matchmaker*) capaz de recibir $N$ juga
 
 ## Compilación y Limpieza
 
-El proyecto incluye un `Makefile` configurado con banderas de optimización y verificación estricta de advertencias (`-Wall -Wextra -std=c++17 -lpthread`):
+El proyecto incluye un `Makefile` configurado con banderas de optimización y verificación estricta de advertencias (`-Wall -Wextra -std=c++17 -pthread`):
 
 * **Compilar el proyecto:**
   ```bash
